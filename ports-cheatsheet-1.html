@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PORT SCANNER — CyberFresher Edition</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff88;
+    --cyan: #00e5ff;
+    --red: #ff3c5e;
+    --yellow: #ffd600;
+    --purple: #b44fff;
+    --orange: #ff7c00;
+    --bg: #050a0e;
+    --surface: #0b1117;
+    --border: #1a2a1a;
+    --dim: #1e3a2a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,136,0.015) 2px,
+      rgba(0,255,136,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+    animation: flicker 8s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.95; }
+    97% { opacity: 1; }
+    98% { opacity: 0.92; }
+  }
+
+  /* Grid noise bg */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 10;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 30px 20px 60px;
+  }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    margin-bottom: 36px;
+    position: relative;
+  }
+
+  .header-pre {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--cyan);
+    font-size: 11px;
+    letter-spacing: 4px;
+    opacity: 0.7;
+    margin-bottom: 6px;
+    animation: blink-in 0.5s ease;
+  }
+
+  .header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(28px, 6vw, 56px);
+    font-weight: 900;
+    color: var(--green);
+    text-shadow:
+      0 0 20px rgba(0,255,136,0.8),
+      0 0 60px rgba(0,255,136,0.3),
+      0 0 100px rgba(0,255,136,0.1);
+    letter-spacing: 4px;
+    line-height: 1.1;
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { text-shadow: 0 0 20px rgba(0,255,136,0.8), 0 0 60px rgba(0,255,136,0.3); }
+    50% { text-shadow: 0 0 30px rgba(0,255,136,1), 0 0 80px rgba(0,255,136,0.5), 0 0 120px rgba(0,255,136,0.2); }
+  }
+
+  .header-sub {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--yellow);
+    font-size: 12px;
+    letter-spacing: 6px;
+    margin-top: 8px;
+    opacity: 0.8;
+  }
+
+  .scan-bar {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), var(--cyan), var(--green), transparent);
+    margin: 20px 0;
+    animation: scan-move 2s ease-in-out infinite alternate;
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  @keyframes scan-move {
+    0% { opacity: 0.4; }
+    100% { opacity: 1; }
+  }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    padding: 8px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    margin-bottom: 28px;
+    border-radius: 2px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    margin-right: 8px;
+    animation: blink 1s step-end infinite;
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* SECTION HEADERS */
+  .section-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 5px;
+    font-weight: 700;
+    padding: 6px 12px;
+    margin-bottom: 16px;
+    display: inline-block;
+    border-radius: 2px;
+  }
+
+  /* GRID LAYOUT */
+  .grid {
+    display: grid;
+    gap: 10px;
+  }
+
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+  @media (max-width: 700px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  /* PORT CARD */
+  .port-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    cursor: default;
+  }
+
+  .port-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.2), inset 0 0 20px rgba(var(--accent-rgb), 0.03);
+  }
+
+  .port-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent-color);
+    box-shadow: 0 0 8px var(--accent-color);
+  }
+
+  .port-card::after {
+    content: attr(data-port);
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(22px, 4vw, 34px);
+    font-weight: 900;
+    color: var(--accent-color);
+    opacity: 0.07;
+    letter-spacing: -1px;
+    pointer-events: none;
+  }
+
+  .port-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent-color);
+    text-shadow: 0 0 10px var(--accent-color);
+    letter-spacing: 1px;
+  }
+
+  .port-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: #aaffcc;
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  .port-desc {
+    font-size: 11px;
+    color: #4a7a5a;
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .port-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  .tag-tcp { background: rgba(0,229,255,0.12); color: var(--cyan); border: 1px solid rgba(0,229,255,0.2); }
+  .tag-udp { background: rgba(255,124,0,0.12); color: var(--orange); border: 1px solid rgba(255,124,0,0.2); }
+  .tag-both { background: rgba(180,79,255,0.12); color: var(--purple); border: 1px solid rgba(180,79,255,0.2); }
+  .tag-vuln { background: rgba(255,60,94,0.12); color: var(--red); border: 1px solid rgba(255,60,94,0.2); }
+  .tag-safe { background: rgba(0,255,136,0.08); color: var(--green); border: 1px solid rgba(0,255,136,0.15); }
+  .tag-enc { background: rgba(255,214,0,0.10); color: var(--yellow); border: 1px solid rgba(255,214,0,0.2); }
+
+  /* COLORS PER CATEGORY */
+  .cat-web { --accent-color: #00e5ff; --accent-rgb: 0,229,255; }
+  .cat-email { --accent-color: #ffd600; --accent-rgb: 255,214,0; }
+  .cat-file { --accent-color: #b44fff; --accent-rgb: 180,79,255; }
+  .cat-remote { --accent-color: #00ff88; --accent-rgb: 0,255,136; }
+  .cat-net { --accent-color: #ff7c00; --accent-rgb: 255,124,0; }
+  .cat-vuln { --accent-color: #ff3c5e; --accent-rgb: 255,60,94; }
+  .cat-db { --accent-color: #00bcd4; --accent-rgb: 0,188,212; }
+
+  /* SECTION STYLING */
+  .section { margin-bottom: 32px; }
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 5px;
+    font-weight: 700;
+    color: #3a6a4a;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+  .section-title span {
+    color: var(--accent-section);
+    text-shadow: 0 0 8px var(--accent-section);
+  }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #2a4a3a;
+    margin-top: 40px;
+    letter-spacing: 3px;
+  }
+
+  .footer em {
+    color: var(--green);
+    font-style: normal;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    margin-bottom: 28px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .legend-title {
+    width: 100%;
+    color: #3a6a4a;
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+    font-size: 9px;
+  }
+
+  /* RISK BADGE */
+  .risk {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+
+  .risk-high { background: rgba(255,60,94,0.15); color: var(--red); border: 1px solid rgba(255,60,94,0.3); }
+  .risk-med { background: rgba(255,214,0,0.12); color: var(--yellow); border: 1px solid rgba(255,214,0,0.25); }
+  .risk-low { background: rgba(0,255,136,0.08); color: var(--green); border: 1px solid rgba(0,255,136,0.15); }
+
+  /* NMAP hint */
+  .nmap-tip {
+    background: var(--surface);
+    border: 1px solid #1a3010;
+    border-left: 3px solid var(--cyan);
+    padding: 10px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--cyan);
+    margin-bottom: 28px;
+    border-radius: 2px;
+  }
+
+  .nmap-tip .cmd { color: var(--yellow); }
+  .nmap-tip .comment { color: #3a6a4a; }
+
+  @keyframes blink-in {
+    0% { opacity: 0; transform: translateY(-4px); }
+    100% { opacity: 0.7; transform: translateY(0); }
+  }
+
+  /* SEARCH BAR */
+  .search-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .search-prefix {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.7;
+  }
+
+  #port-search {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 12px 16px 12px 110px;
+    border-radius: 2px;
+    outline: none;
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+    caret-color: var(--green);
+  }
+
+  #port-search::placeholder {
+    color: #2a5a3a;
+    letter-spacing: 1px;
+  }
+
+  #port-search:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 16px rgba(0,229,255,0.15), inset 0 0 12px rgba(0,229,255,0.04);
+  }
+
+  .search-count {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #3a6a4a;
+    letter-spacing: 2px;
+    pointer-events: none;
+  }
+
+  .search-count.active { color: var(--green); }
+
+  /* No results message */
+  #no-results {
+    display: none;
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--red);
+    padding: 30px;
+    letter-spacing: 2px;
+    border: 1px dashed rgba(255,60,94,0.2);
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+
+  /* Section hide when all cards hidden */
+  .section.hidden { display: none; }
+
+  /* Highlight match */
+  .search-highlight {
+    background: rgba(0,229,255,0.2);
+    color: var(--cyan);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  /* Card hidden state */
+  .port-card.hidden {
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-pre">▸▸ NETWORK RECON INTERFACE v2.6 ◂◂</div>
+    <h1>COMMON PORTS</h1>
+    <div class="header-sub">CYBERSECURITY FRESHER FIELD GUIDE</div>
+  </div>
+
+  <div class="scan-bar"></div>
+
+  <!-- STATUS -->
+  <div class="status-bar">
+    <div><span class="status-dot"></span>SCAN ACTIVE · TARGET: 0.0.0.0/0 · PROTOCOL: TCP/UDP</div>
+    <div>PORTS LOADED: <span style="color:var(--green)">35</span></div>
+    <div style="color:#3a6a4a">nmap -sV --top-ports 1000</div>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div class="search-wrapper">
+    <span class="search-prefix">$ grep -p</span>
+    <input type="text" id="port-search" placeholder="search port number, name, or protocol... e.g. 443, ssh, ftp" autocomplete="off" spellcheck="false" />
+    <span class="search-count" id="search-count"></span>
+  </div>
+
+  <div id="no-results">▸ NO PORTS MATCHED · TRY A DIFFERENT QUERY ◂</div>
+
+  <!-- NMAP TIP -->
+  <div class="nmap-tip">
+    <span class="cmd">$ nmap -p 22,80,443,3306 &lt;target&gt;</span>
+    &nbsp;&nbsp;<span class="comment"># scan specific ports</span><br>
+    <span class="cmd">$ netstat -tulpn</span>
+    &nbsp;&nbsp;<span class="comment"># see open ports on YOUR machine</span>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-title">▸ TAG LEGEND</div>
+    <span class="tag tag-tcp">TCP</span> reliable, connection-based &nbsp;|&nbsp;
+    <span class="tag tag-udp">UDP</span> fast, connectionless &nbsp;|&nbsp;
+    <span class="tag tag-both">BOTH</span> dual-stack &nbsp;|&nbsp;
+    <span class="tag tag-vuln">⚠ VULN</span> frequent attack target &nbsp;|&nbsp;
+    <span class="tag tag-enc">🔒 ENC</span> encrypted &nbsp;|&nbsp;
+    <span class="tag tag-safe">✓ SAFE</span> inherently secure
+  </div>
+
+  <!-- WEB -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #00e5ff"><span>◈</span> WEB & HTTP</div>
+    <div class="grid grid-3">
+
+      <div class="port-card cat-web" data-port="80">
+        <div class="risk risk-high">HIGH RISK</div>
+        <div class="port-num">:80</div>
+        <div class="port-name">HTTP</div>
+        <div class="port-desc">Unencrypted web traffic. Everything sent here is visible as plaintext. Default port for websites without SSL.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-web" data-port="443">
+        <div class="risk risk-low">SECURE</div>
+        <div class="port-num">:443</div>
+        <div class="port-name">HTTPS / TLS</div>
+        <div class="port-desc">Encrypted HTTP. SSL/TLS handshake on this port. Standard for all modern websites. Always prefer over :80.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+      <div class="port-card cat-web" data-port="8080">
+        <div class="risk risk-med">CAUTION</div>
+        <div class="port-num">:8080</div>
+        <div class="port-name">HTTP Alt / Proxy</div>
+        <div class="port-desc">Alternative HTTP, dev servers, Burp Suite default proxy listener. Often left open accidentally in production.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-web" data-port="8443">
+        <div class="risk risk-low">OK</div>
+        <div class="port-num">:8443</div>
+        <div class="port-name">HTTPS Alt</div>
+        <div class="port-desc">Alternate HTTPS port. Used by Tomcat, web panels, admin consoles. Still TLS-encrypted like 443.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+      <div class="port-card cat-web" data-port="3000">
+        <div class="risk risk-med">DEV</div>
+        <div class="port-num">:3000</div>
+        <div class="port-name">Node / React Dev</div>
+        <div class="port-desc">Default for Node.js, React, Express apps. Should NEVER be exposed publicly. Common in CTF recon.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-web" data-port="5000">
+        <div class="risk risk-med">DEV</div>
+        <div class="port-num">:5000</div>
+        <div class="port-name">Flask / Dev Server</div>
+        <div class="port-desc">Python Flask default, Docker APIs. Often runs without auth in dev envs. Easy pivot point if exposed.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- REMOTE ACCESS -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #00ff88"><span>◈</span> REMOTE ACCESS</div>
+    <div class="grid grid-3">
+
+      <div class="port-card cat-remote" data-port="22">
+        <div class="risk risk-med">MONITOR</div>
+        <div class="port-num">:22</div>
+        <div class="port-name">SSH</div>
+        <div class="port-desc">Encrypted shell. Brute-forced constantly. Change to non-standard port + disable root login + use key auth only.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-remote" data-port="23">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:23</div>
+        <div class="port-name">Telnet</div>
+        <div class="port-desc">Cleartext predecessor to SSH. Credentials fully visible on network. If you see this open — it's a finding.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-remote" data-port="3389">
+        <div class="risk risk-high">HIGH RISK</div>
+        <div class="port-num">:3389</div>
+        <div class="port-name">RDP</div>
+        <div class="port-desc">Windows Remote Desktop. BlueKeep (CVE-2019-0708), DejaBlue — massive attack surface. Never expose directly to internet.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-remote" data-port="5900">
+        <div class="risk risk-high">HIGH RISK</div>
+        <div class="port-num">:5900</div>
+        <div class="port-name">VNC</div>
+        <div class="port-desc">Virtual Network Computing. Often no auth or weak passwords. Graphical desktop access. Tunnel over SSH always.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-remote" data-port="1194">
+        <div class="risk risk-low">SAFE</div>
+        <div class="port-num">:1194</div>
+        <div class="port-name">OpenVPN</div>
+        <div class="port-desc">Default OpenVPN port. Encrypted tunnel. Used to secure traffic between clients and networks.</div>
+        <div class="port-tags"><span class="tag tag-udp">UDP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+      <div class="port-card cat-remote" data-port="500">
+        <div class="risk risk-low">NET</div>
+        <div class="port-num">:500</div>
+        <div class="port-name">IKE / IPSec</div>
+        <div class="port-desc">Internet Key Exchange — sets up VPN tunnels. Common in enterprise firewall configs and site-to-site VPNs.</div>
+        <div class="port-tags"><span class="tag tag-udp">UDP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FILE TRANSFER -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #b44fff"><span>◈</span> FILE TRANSFER</div>
+    <div class="grid grid-2">
+
+      <div class="port-card cat-file" data-port="21">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:21</div>
+        <div class="port-name">FTP Control</div>
+        <div class="port-desc">File Transfer Protocol — cleartext. Creds, data, everything visible. Anonymous FTP login is a classic misconfiguration. Replace with SFTP.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-file" data-port="20">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:20</div>
+        <div class="port-name">FTP Data</div>
+        <div class="port-desc">Active FTP data channel. Pairs with :21. Used to actually transfer files. Same issues as FTP control.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-file" data-port="22">
+        <div class="risk risk-low">SECURE</div>
+        <div class="port-num">:22</div>
+        <div class="port-name">SFTP (over SSH)</div>
+        <div class="port-desc">Secure FTP tunneled over SSH. Same port as SSH. ALWAYS use SFTP instead of plain FTP for file transfer.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+      <div class="port-card cat-file" data-port="445">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:445</div>
+        <div class="port-name">SMB / Samba</div>
+        <div class="port-desc">Windows file sharing. EternalBlue exploit → WannaCry ransomware. Never expose externally. Patch immediately always.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EMAIL -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #ffd600"><span>◈</span> EMAIL PROTOCOLS</div>
+    <div class="grid grid-3">
+
+      <div class="port-card cat-email" data-port="25">
+        <div class="risk risk-high">SPAM RISK</div>
+        <div class="port-num">:25</div>
+        <div class="port-name">SMTP</div>
+        <div class="port-desc">Mail server-to-server. Open relay = spammer's paradise. Should be filtered externally. Don't expose.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-email" data-port="587">
+        <div class="risk risk-low">OK</div>
+        <div class="port-num">:587</div>
+        <div class="port-name">SMTP (STARTTLS)</div>
+        <div class="port-desc">Modern email submission port. Requires auth + STARTTLS upgrade. Use this for sending email from apps.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+      <div class="port-card cat-email" data-port="465">
+        <div class="risk risk-low">OK</div>
+        <div class="port-num">:465</div>
+        <div class="port-name">SMTP over SSL</div>
+        <div class="port-desc">SMTPS — SMTP wrapped in SSL from the start. Used by Gmail, Outlook for secure sending. Legacy but still common.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+      <div class="port-card cat-email" data-port="110">
+        <div class="risk risk-high">AVOID</div>
+        <div class="port-num">:110</div>
+        <div class="port-name">POP3</div>
+        <div class="port-desc">Post Office Protocol — downloads email, deletes from server. Cleartext. Use POP3S (:995) instead.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-email" data-port="143">
+        <div class="risk risk-med">UPGRADE</div>
+        <div class="port-num">:143</div>
+        <div class="port-name">IMAP</div>
+        <div class="port-desc">Internet Message Access Protocol — sync email across devices. Use IMAPS (:993) with TLS instead of this.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-email" data-port="993">
+        <div class="risk risk-low">SAFE</div>
+        <div class="port-num">:993</div>
+        <div class="port-name">IMAPS</div>
+        <div class="port-desc">IMAP over SSL/TLS. Encrypted email sync. What Outlook, Thunderbird etc. use. Prefer this always.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DATABASES -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #00bcd4"><span>◈</span> DATABASES</div>
+    <div class="grid grid-3">
+
+      <div class="port-card cat-db" data-port="3306">
+        <div class="risk risk-high">NEVER EXPOSE</div>
+        <div class="port-num">:3306</div>
+        <div class="port-name">MySQL / MariaDB</div>
+        <div class="port-desc">Default MySQL port. If this is open to internet, it's a critical finding. Bind to 127.0.0.1 always.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-db" data-port="5432">
+        <div class="risk risk-high">NEVER EXPOSE</div>
+        <div class="port-num">:5432</div>
+        <div class="port-name">PostgreSQL</div>
+        <div class="port-desc">Postgres default port. Like MySQL — must be localhost only. Use SSH tunnel or VPN to access remotely.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-db" data-port="1433">
+        <div class="risk risk-high">NEVER EXPOSE</div>
+        <div class="port-num">:1433</div>
+        <div class="port-name">MSSQL</div>
+        <div class="port-desc">Microsoft SQL Server. SA account brute-force is classic. xp_cmdshell can give OS access if misconfigured.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-db" data-port="27017">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:27017</div>
+        <div class="port-name">MongoDB</div>
+        <div class="port-desc">MongoDB default — notoriously left open with NO auth by default in older versions. Millions of DBs leaked this way.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-db" data-port="6379">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:6379</div>
+        <div class="port-name">Redis</div>
+        <div class="port-desc">Redis in-memory DB. Default: NO auth. If exposed, attackers can read all keys, write SSH keys, get RCE.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-db" data-port="9200">
+        <div class="risk risk-high">CRITICAL</div>
+        <div class="port-num">:9200</div>
+        <div class="port-name">Elasticsearch</div>
+        <div class="port-desc">Elastic REST API. Historically no auth by default — massive data breaches. Shodan finds thousands exposed daily.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NETWORK SERVICES -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #ff7c00"><span>◈</span> NETWORK SERVICES</div>
+    <div class="grid grid-3">
+
+      <div class="port-card cat-net" data-port="53">
+        <div class="risk risk-med">MONITOR</div>
+        <div class="port-num">:53</div>
+        <div class="port-name">DNS</div>
+        <div class="port-desc">Domain Name System. UDP for queries, TCP for zone transfers. DNS tunneling used for C2 comms. Zone transfer = AXFR.</div>
+        <div class="port-tags"><span class="tag tag-both">BOTH</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-net" data-port="67">
+        <div class="risk risk-med">LAN</div>
+        <div class="port-num">:67/68</div>
+        <div class="port-name">DHCP</div>
+        <div class="port-desc">Dynamic IP assignment. Rogue DHCP server attack — attacker becomes gateway. Starvation via DHCP Discover flood.</div>
+        <div class="port-tags"><span class="tag tag-udp">UDP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-net" data-port="161">
+        <div class="risk risk-high">HIGH RISK</div>
+        <div class="port-num">:161</div>
+        <div class="port-name">SNMP</div>
+        <div class="port-desc">Simple Network Mgmt Protocol. Default community string "public" leaks entire network topology. v1/v2c = cleartext.</div>
+        <div class="port-tags"><span class="tag tag-udp">UDP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-net" data-port="389">
+        <div class="risk risk-med">CAUTION</div>
+        <div class="port-num">:389</div>
+        <div class="port-name">LDAP</div>
+        <div class="port-desc">Directory services (Active Directory). Anonymous LDAP bind can expose all users. Use LDAPS (:636) with TLS.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-net" data-port="88">
+        <div class="risk risk-med">AD</div>
+        <div class="port-num">:88</div>
+        <div class="port-name">Kerberos</div>
+        <div class="port-desc">Auth protocol for Active Directory. Kerberoasting, AS-REP roasting, Pass-the-Ticket attacks target this port.</div>
+        <div class="port-tags"><span class="tag tag-both">BOTH</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-net" data-port="123">
+        <div class="risk risk-low">OK</div>
+        <div class="port-num">:123</div>
+        <div class="port-name">NTP</div>
+        <div class="port-desc">Network Time Protocol. Time sync critical for Kerberos auth. Misconfigured NTP used in DDoS amplification attacks.</div>
+        <div class="port-tags"><span class="tag tag-udp">UDP</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- HIGH-RISK EXTRAS -->
+  <div class="section">
+    <div class="section-title" style="--accent-section: #ff3c5e"><span>◈</span> HIGH-VALUE TARGETS (CTF & PENTEST)</div>
+    <div class="grid grid-3">
+
+      <div class="port-card cat-vuln" data-port="4444">
+        <div class="risk risk-high">C2</div>
+        <div class="port-num">:4444</div>
+        <div class="port-name">Metasploit Default</div>
+        <div class="port-desc">Meterpreter default reverse shell. If you see outbound connections to :4444 — you've likely been compromised.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-vuln" data-port="135">
+        <div class="risk risk-high">WINDOWS</div>
+        <div class="port-num">:135</div>
+        <div class="port-name">RPC / DCOM</div>
+        <div class="port-desc">Windows RPC endpoint mapper. Used by many Windows services. MS08-067 historically targeted this. Block at perimeter.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+      <div class="port-card cat-vuln" data-port="2049">
+        <div class="risk risk-high">HIGH RISK</div>
+        <div class="port-num">:2049</div>
+        <div class="port-name">NFS</div>
+        <div class="port-desc">Network File System. Misconfigured NFS shares expose entire filesystems. no_root_squash is a pentest goldmine.</div>
+        <div class="port-tags"><span class="tag tag-both">BOTH</span><span class="tag tag-vuln">⚠ VULN</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="scan-bar"></div>
+  <div class="footer">
+    <div>▸ SCAN COMPLETE · ALL PORTS ENUMERATED · STAY ETHICAL · HACK ONLY WITH PERMISSION ◂</div>
+    <br>
+    <div><em>nmap · netcat · wireshark · burpsuite · metasploit</em> — your daily toolkit</div>
+  </div>
+
+</div>
+
+<script>
+  const searchInput = document.getElementById('port-search');
+  const searchCount = document.getElementById('search-count');
+  const noResults = document.getElementById('no-results');
+  const allCards = document.querySelectorAll('.port-card');
+  const allSections = document.querySelectorAll('.section');
+  const totalPorts = allCards.length;
+
+  searchInput.addEventListener('input', () => {
+    const raw = searchInput.value.trim().toLowerCase();
+
+    if (!raw) {
+      // Reset everything
+      allCards.forEach(c => c.classList.remove('hidden'));
+      allSections.forEach(s => s.classList.remove('hidden'));
+      noResults.style.display = 'none';
+      searchCount.textContent = '';
+      searchCount.classList.remove('active');
+      return;
+    }
+
+    let matchCount = 0;
+
+    allCards.forEach(card => {
+      const portNum = (card.getAttribute('data-port') || '').toLowerCase();
+      const portName = (card.querySelector('.port-name')?.textContent || '').toLowerCase();
+      const portDesc = (card.querySelector('.port-desc')?.textContent || '').toLowerCase();
+      const portTags = (card.querySelector('.port-tags')?.textContent || '').toLowerCase();
+      const riskBadge = (card.querySelector('.risk')?.textContent || '').toLowerCase();
+
+      const haystack = `${portNum} ${portName} ${portDesc} ${portTags} ${riskBadge}`;
+      const matches = haystack.includes(raw);
+
+      card.classList.toggle('hidden', !matches);
+      if (matches) matchCount++;
+    });
+
+    // Hide sections with no visible cards
+    allSections.forEach(section => {
+      const visibleCards = section.querySelectorAll('.port-card:not(.hidden)');
+      section.classList.toggle('hidden', visibleCards.length === 0);
+    });
+
+    // Count display
+    if (matchCount > 0) {
+      searchCount.textContent = `${matchCount}/${totalPorts} FOUND`;
+      searchCount.classList.add('active');
+      noResults.style.display = 'none';
+    } else {
+      searchCount.textContent = '0 FOUND';
+      searchCount.classList.remove('active');
+      noResults.style.display = 'block';
+    }
+  });
+
+  // Focus shortcut: press "/" to jump to search
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement !== searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchInput.dispatchEvent(new Event('input'));
+      searchInput.blur();
+    }
+  });
+</script>
+</body>
+</html>

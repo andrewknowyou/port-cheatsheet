@@ -488,7 +488,7 @@
   <!-- STATUS -->
   <div class="status-bar">
     <div><span class="status-dot"></span>SCAN ACTIVE · TARGET: 0.0.0.0/0 · PROTOCOL: TCP/UDP</div>
-    <div>PORTS LOADED: <span style="color:var(--green)">35</span></div>
+    <div>PORTS LOADED: <span id="ports-loaded-count" style="color:var(--green)">0</span></div>
     <div style="color:#3a6a4a">nmap -sV --top-ports 1000</div>
   </div>
 
@@ -709,6 +709,14 @@
         <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
       </div>
 
+      <div class="port-card cat-email" data-port="995">
+        <div class="risk risk-low">SAFE</div>
+        <div class="port-num">:995</div>
+        <div class="port-name">POP3S</div>
+        <div class="port-desc">POP3 over SSL/TLS. Encrypted alternative to POP3 for receiving mail securely without exposing credentials in plaintext.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
       <div class="port-card cat-email" data-port="143">
         <div class="risk risk-med">UPGRADE</div>
         <div class="port-num">:143</div>
@@ -821,6 +829,14 @@
         <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-vuln">⚠ VULN</span></div>
       </div>
 
+      <div class="port-card cat-net" data-port="636">
+        <div class="risk risk-low">SAFE</div>
+        <div class="port-num">:636</div>
+        <div class="port-name">LDAPS</div>
+        <div class="port-desc">LDAP over SSL/TLS. Encrypts directory queries and credentials for safer Active Directory and directory service access.</div>
+        <div class="port-tags"><span class="tag tag-tcp">TCP</span><span class="tag tag-enc">🔒 ENC</span></div>
+      </div>
+
       <div class="port-card cat-net" data-port="88">
         <div class="risk risk-med">AD</div>
         <div class="port-num">:88</div>
@@ -889,6 +905,8 @@
   const allCards = document.querySelectorAll('.port-card');
   const allSections = document.querySelectorAll('.section');
   const totalPorts = allCards.length;
+  const portsLoadedCount = document.getElementById('ports-loaded-count');
+  if (portsLoadedCount) portsLoadedCount.textContent = String(totalPorts);
 
   searchInput.addEventListener('input', () => {
     const raw = searchInput.value.trim().toLowerCase();

@@ -488,7 +488,7 @@
   <!-- STATUS -->
   <div class="status-bar">
     <div><span class="status-dot"></span>SCAN ACTIVE · TARGET: 0.0.0.0/0 · PROTOCOL: TCP/UDP</div>
-    <div>PORTS LOADED: <span style="color:var(--green)">39</span></div>
+    <div>PORTS LOADED: <span id="ports-loaded-count" style="color:var(--green)">0</span></div>
     <div style="color:#3a6a4a">nmap -sV --top-ports 1000</div>
   </div>
 
@@ -905,6 +905,8 @@
   const allCards = document.querySelectorAll('.port-card');
   const allSections = document.querySelectorAll('.section');
   const totalPorts = allCards.length;
+  const portsLoadedCount = document.getElementById('ports-loaded-count');
+  if (portsLoadedCount) portsLoadedCount.textContent = String(totalPorts);
 
   searchInput.addEventListener('input', () => {
     const raw = searchInput.value.trim().toLowerCase();
